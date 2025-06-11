@@ -7,8 +7,8 @@ from timm.models.layers import DropPath, to_2tuple, trunc_normal_
 from timm.models.registry import register_model
 from timm.models.vision_transformer import _cfg
 
-from mmdet.vtpack.layers import DynamicGrainedEncoder
-from mmdet.vtpack.layers.sparse_ops import batched_sparse_attention, batched_sparse_gemm
+# from mmdet.vtpack.layers import DynamicGrainedEncoder
+# from mmdet.vtpack.layers.sparse_ops import batched_sparse_attention, batched_sparse_gemm
 
 from mmdet.registry import MODELS
 __all__ = [

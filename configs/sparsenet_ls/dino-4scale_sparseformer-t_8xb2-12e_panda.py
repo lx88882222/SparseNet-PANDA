@@ -2,12 +2,12 @@ _base_ = [
     '../_base_/datasets/panda_detection.py', '../_base_/default_runtime.py'
 ]
 
-custom_imports = dict(
-    imports=['mmdet.models.backbones.sparsenet'], # 指向原始的 sparsenet.py
-    allow_failed_imports=False)
-
 # pretrained = 'https://github.com/SwinTransformer/storage/releases/download/v1.0.0/swin_tiny_patch4_window7_224.pth'  # noqa
-# pretrained = '/home/liwenxi/mmdetection/giga_tiny_global.pth'  # noqa # 确保这一行被注释掉
+# pretrained = '/home/liwenxi/mmdetection/giga_tiny_global.pth'  # noqa
+
+# custom_imports = dict(
+#     imports=['mmdet.models.backbones.sparsenet_ls_local'], # 假设你的修改在这个文件
+#     allow_failed_imports=False)
 
 find_unused_parameters=True
 model = dict(
@@ -33,13 +33,19 @@ model = dict(
     #     init_cfg=dict(type='Pretrained', checkpoint='torchvision://resnet50')),
     backbone=dict(
         # _delete_=True,
-        type='SparseNet', # 将通过 custom_imports 找到 sparsenet.py 中的定义
-        embed_dims=64,
-        depths=[2, 2, 6, 2],  
-        layers=[2, 2, 6, 2],  
-        num_heads=[3, 6, 12, 24], 
-        top_k=[0.7, 0.7, 0.7, 0.7],  
-        window_size=7, 
+        type='SparseNet', # 确保这里指向 sparsenet_ls_local.py 中的类名
+        embed_dims=96,  # 修改: 64 -> 96 (假设预训练模型是96)
+        depths=[2, 2, 6, 2],
+        layers=[2, 2, 6, 2], 
+        # num_heads 通常需要根据 embed_dims 调整，如果 Swin 的 head_dim 是固定的 (e.g., 32)
+        # 那么 num_heads = embed_dims / head_dim。原始 SparseNet/Swin-T 可能 num_heads=[3, 6, 12, 24] 对应 embed_dims=96
+        # 如果我们保持 num_heads=[3,6,12,24] 而 embed_dims=64，则不匹配。但 LocalBlock 已不用 attention。
+        # 为了尽可能匹配预训练的 GlobalBlock (如果它有可加载的注意力部分) 或其他结构，我们先保持 num_heads 不变，
+        # 主要的 mismatch 来自 embed_dims 自身的变化。
+        # 或者，如果 giga_tiny_global.pth 对应 Swin-T (embed_dim=96, num_heads=[3,6,12,24])，我们就用这个。
+        num_heads=[3, 6, 12, 24],
+        top_k=[0.7, 0.7, 0.7, 0.7], 
+        window_size=7,
         mlp_ratio=4,
         qkv_bias=True,
         qk_scale=None,
@@ -48,15 +54,12 @@ model = dict(
         drop_path_rate=0.2,
         patch_norm=True,
         out_indices=(1, 2, 3),
-        # Please only add indices that would be used
-        # in FPN, otherwise some parameter will not be used
-        with_cp=True, 
-        convert_weights=True, # 从头训练，不需要转换 
-        init_cfg=None), # 确保不加载预训练
+        with_cp=False,
+        init_cfg=dict(type='Pretrained', checkpoint='/home/liwenxi/mmdetection/giga_tiny_global.pth')
+    ),
     neck=dict(
         type='ChannelMapper',
-        # in_channels=[192, 384, 768],
-        in_channels=[128, 256, 512], # 对应 embed_dims=64, out_indices=(1,2,3) -> 64*2, 64*4, 64*8
+        in_channels=[192, 384, 768], # 修改以匹配 embed_dims=96: C1=96*2, C2=192*2, C3=384*2
         kernel_size=1,
         out_channels=256,
         act_cfg=None,
@@ -159,48 +162,45 @@ train_pipeline = [
     dict(type='PackDetInputs')
 ]
 train_dataloader = dict(
-    batch_size=1, # 保持batch_size为1
     dataset=dict(
-        filter_cfg=dict(filter_empty_gt=False), pipeline=train_pipeline),
-    sampler=dict(type='DefaultSampler', shuffle=True),
-    batch_sampler=dict(type='AspectRatioBatchSampler'),
-    pin_memory=True)
+        filter_cfg=dict(filter_empty_gt=False), pipeline=train_pipeline))
 
 # optimizer
 optim_wrapper = dict(
-    type='OptimWrapper',  # 保持禁用混合精度
+    type='OptimWrapper',
     optimizer=dict(
         type='AdamW',
-        # lr=0.0001,  
-        lr = 0.00005,
+        lr=2e-6,  # <--- 大幅度降低学习率
         weight_decay=0.0001),
     clip_grad=dict(max_norm=0.1, norm_type=2),
     paramwise_cfg=dict(custom_keys={'backbone': dict(lr_mult=0.1)})
-)
+)  # custom_keys contains sampling_offsets and reference_points in DeformDETR  # noqa
 
 # learning policy
-param_schedulers = [
-    dict(
-        type='LinearLR', start_factor=0.001, by_epoch=False, begin=0,
-        end=500),
-    dict(
-        type='MultiStepLR',
-        begin=0,
-        end=48,  # 修改这里: 36 -> 48
-        by_epoch=True,
-        milestones=[24, 33], # 保持不变
-        gamma=0.1)
-]
+max_epochs = 12 # 原始DINO配置中是36，但文件名是12e，这里用12e
+train_cfg = dict(
+    type='EpochBasedTrainLoop', max_epochs=max_epochs, val_interval=1)
 
-# training schedule for 36e
-train_cfg = dict(type='EpochBasedTrainLoop', max_epochs=48, val_interval=1) # 修改这里: 36 -> 42
 val_cfg = dict(type='ValLoop')
 test_cfg = dict(type='TestLoop')
 
-# 加载指定epoch的权重
-load_from = 'work_dirs/dino_sparsenet_original_resume_ep36_6gpu_20250529_163241/epoch_42.pth' # 修改这里
+param_scheduler = [
+    dict(
+        type='LinearLR',
+        start_factor=0.001, # 或者更小，比如 1e-4 / (2e-5) = 0.005，或者直接用0.01
+        by_epoch=False,
+        begin=0,
+        end=500), # warmup 500 iterations
+    dict(
+        type='MultiStepLR',
+        begin=0, # MultiStepLR 的 begin 应在 warmup 结束后，或者让 MMEngine 自动处理
+        end=max_epochs,
+        by_epoch=True,
+        milestones=[11], # 假设 max_epochs=12
+        gamma=0.1)
+]
 
 # NOTE: `auto_scale_lr` is for automatically scaling LR,
 # USER SHOULD NOT CHANGE ITS VALUES.
 # base_batch_size = (8 GPUs) x (2 samples per GPU)
-auto_scale_lr = dict(base_batch_size=16) # 保持不变
+auto_scale_lr = dict(base_batch_size=16)

@@ -1808,7 +1808,7 @@ class SparseFormer(BaseModule):
         else:
             raise TypeError('pretrained must be a str or None')
 
-        super(GigaTransformer, self).__init__(init_cfg=init_cfg)
+        super(SparseFormer, self).__init__(init_cfg=init_cfg)
 
         num_layers = len(depths)
         self.out_indices = out_indices
@@ -1883,7 +1883,7 @@ class SparseFormer(BaseModule):
 
     def train(self, mode=True):
         """Convert the model into training mode while keep layers freezed."""
-        super(GigaTransformer, self).train(mode)
+        super(SparseFormer, self).train(mode)
         self._freeze_stages()
 
     def _freeze_stages(self):

@@ -1,0 +1,99 @@
+
++---------------------------------------------+----------------------+------------+--------------+
+|[1m [0m[1mmodule                                     [0m[1m [0m|[1m [0m[1m#parameters or shape[0m[1m [0m|[1m [0m[1m#flops    [0m[1m [0m|[1m [0m[1m#activations[0m[1m [0m|
++---------------------------------------------+----------------------+------------+--------------+
+| model                                       | 39.17M               | 0.171T     | 0.488G       |
+|  level_embed                                |  (4, 256)            |            |              |
+|  backbone                                   |  19.365M             |  2.39G     |  11.328M     |
+|   backbone.patch_embed                      |   3.264K             |   0.189G   |   3.57M      |
+|    backbone.patch_embed.projection          |    3.136K            |    0.171G  |    3.57M     |
+|    backbone.patch_embed.norm                |    0.128K            |    17.849M |    0         |
+|   backbone.stages                           |   19.36M             |   2.185G   |   7.758M     |
+|    backbone.stages.0                        |    0.199M            |    0.67G   |    3.838M    |
+|    backbone.stages.1                        |    0.781M            |    0.639G  |    1.899M    |
+|    backbone.stages.2                        |    8.19M             |    0.753G  |    1.871M    |
+|    backbone.stages.3                        |    10.189M           |    0.123G  |    0.15M     |
+|   backbone.norm1                            |   0.256K             |   8.978M   |   0          |
+|    backbone.norm1.weight                    |    (128,)            |            |              |
+|    backbone.norm1.bias                      |    (128,)            |            |              |
+|   backbone.norm2                            |   0.512K             |   4.516M   |   0          |
+|    backbone.norm2.weight                    |    (256,)            |            |              |
+|    backbone.norm2.bias                      |    (256,)            |            |              |
+|   backbone.norm3                            |   1.024K             |   2.258M   |   0          |
+|    backbone.norm3.weight                    |    (512,)            |            |              |
+|    backbone.norm3.bias                      |    (512,)            |            |              |
+|  neck                                       |  1.411M              |  1.103G    |  4.779M      |
+|   neck.convs                                |   0.231M             |   0.83G    |   4.72M      |
+|    neck.convs.0                             |    33.28K            |    0.478G  |    3.591M    |
+|    neck.convs.1                             |    66.048K           |    0.236G  |    0.903M    |
+|    neck.convs.2                             |    0.132M            |    0.117G  |    0.226M    |
+|   neck.extra_convs.0                        |   1.18M              |   0.273G   |   59.136K    |
+|    neck.extra_convs.0.conv                  |    1.18M             |    0.272G  |    59.136K   |
+|    neck.extra_convs.0.gn                    |    0.512K            |    0.296M  |    0         |
+|  bbox_head                                  |  0.93M               |  3.899G    |  15.23M      |
+|   bbox_head.cls_branches                    |   1.799K             |   6.162M   |   24.069K    |
+|    bbox_head.cls_branches.0                 |    0.257K            |    0.23M   |    0.9K      |
+|    bbox_head.cls_branches.1                 |    0.257K            |    0.23M   |    0.9K      |
+|    bbox_head.cls_branches.2                 |    0.257K            |    0.23M   |    0.9K      |
+|    bbox_head.cls_branches.3                 |    0.257K            |    0.23M   |    0.9K      |
+|    bbox_head.cls_branches.4                 |    0.257K            |    0.23M   |    0.9K      |
+|    bbox_head.cls_branches.5                 |    0.257K            |    0.23M   |    0.9K      |
+|    bbox_head.cls_branches.6                 |    0.257K            |    4.779M  |    18.669K   |
+|   bbox_head.reg_branches                    |   0.928M             |   3.893G   |   15.206M    |
+|    bbox_head.reg_branches.0                 |    0.133M            |    0.238G  |    0.929M    |
+|    bbox_head.reg_branches.1                 |    0.133M            |    0.238G  |    0.929M    |
+|    bbox_head.reg_branches.2                 |    0.133M            |    0.238G  |    0.929M    |
+|    bbox_head.reg_branches.3                 |    0.133M            |    0.238G  |    0.929M    |
+|    bbox_head.reg_branches.4                 |    0.133M            |    0.238G  |    0.929M    |
+|    bbox_head.reg_branches.5                 |    0.133M            |    0.238G  |    0.929M    |
+|    bbox_head.reg_branches.6                 |    0.133M            |    2.466G  |    9.633M    |
+|  encoder.layers                             |  7.693M              |  0.143T    |  0.358G      |
+|   encoder.layers.0                          |   1.282M             |   23.906G  |   59.741M    |
+|    encoder.layers.0.self_attn               |    0.23M             |    4.282G  |    16.727M   |
+|    encoder.layers.0.ffn.layers              |    1.051M            |    19.576G |    43.013M   |
+|    encoder.layers.0.norms                   |    1.024K            |    47.793M |    0         |
+|   encoder.layers.1                          |   1.282M             |   23.906G  |   59.741M    |
+|    encoder.layers.1.self_attn               |    0.23M             |    4.282G  |    16.727M   |
+|    encoder.layers.1.ffn.layers              |    1.051M            |    19.576G |    43.013M   |
+|    encoder.layers.1.norms                   |    1.024K            |    47.793M |    0         |
+|   encoder.layers.2                          |   1.282M             |   23.906G  |   59.741M    |
+|    encoder.layers.2.self_attn               |    0.23M             |    4.282G  |    16.727M   |
+|    encoder.layers.2.ffn.layers              |    1.051M            |    19.576G |    43.013M   |
+|    encoder.layers.2.norms                   |    1.024K            |    47.793M |    0         |
+|   encoder.layers.3                          |   1.282M             |   23.906G  |   59.741M    |
+|    encoder.layers.3.self_attn               |    0.23M             |    4.282G  |    16.727M   |
+|    encoder.layers.3.ffn.layers              |    1.051M            |    19.576G |    43.013M   |
+|    encoder.layers.3.norms                   |    1.024K            |    47.793M |    0         |
+|   encoder.layers.4                          |   1.282M             |   23.906G  |   59.741M    |
+|    encoder.layers.4.self_attn               |    0.23M             |    4.282G  |    16.727M   |
+|    encoder.layers.4.ffn.layers              |    1.051M            |    19.576G |    43.013M   |
+|    encoder.layers.4.norms                   |    1.024K            |    47.793M |    0         |
+|   encoder.layers.5                          |   1.282M             |   23.906G  |   59.741M    |
+|    encoder.layers.5.self_attn               |    0.23M             |    4.282G  |    16.727M   |
+|    encoder.layers.5.ffn.layers              |    1.051M            |    19.576G |    43.013M   |
+|    encoder.layers.5.norms                   |    1.024K            |    47.793M |    0         |
+|  decoder                                    |  9.473M              |  18.881G   |  93.13M      |
+|   decoder.layers                            |   9.275M             |   17.813G  |   90.365M    |
+|    decoder.layers.0                         |    1.546M            |    2.969G  |    15.061M   |
+|    decoder.layers.1                         |    1.546M            |    2.969G  |    15.061M   |
+|    decoder.layers.2                         |    1.546M            |    2.969G  |    15.061M   |
+|    decoder.layers.3                         |    1.546M            |    2.969G  |    15.061M   |
+|    decoder.layers.4                         |    1.546M            |    2.969G  |    15.061M   |
+|    decoder.layers.5                         |    1.546M            |    2.969G  |    15.061M   |
+|   decoder.ref_point_head.layers             |   0.197M             |   1.062G   |   2.765M     |
+|    decoder.ref_point_head.layers.0          |    0.131M            |    0.708G  |    1.382M    |
+|    decoder.ref_point_head.layers.1          |    65.792K           |    0.354G  |    1.382M    |
+|   decoder.norm                              |   0.512K             |   6.912M   |   0          |
+|    decoder.norm.weight                      |    (256,)            |            |              |
+|    decoder.norm.bias                        |    (256,)            |            |              |
+|  query_embedding                            |  0.23M               |            |              |
+|   query_embedding.weight                    |   (900, 256)         |            |              |
+|  memory_trans_fc                            |  65.792K             |  1.223G    |  4.779M      |
+|   memory_trans_fc.weight                    |   (256, 256)         |            |              |
+|   memory_trans_fc.bias                      |   (256,)             |            |              |
+|  memory_trans_norm                          |  0.512K              |  23.896M   |  0           |
+|   memory_trans_norm.weight                  |   (256,)             |            |              |
+|   memory_trans_norm.bias                    |   (256,)             |            |              |
+|  dn_query_generator.label_embedding         |  0.256K              |            |              |
+|   dn_query_generator.label_embedding.weight |   (1, 256)           |            |              |
++---------------------------------------------+----------------------+------------+--------------+

@@ -28,6 +28,7 @@ from mmdet.registry import MODELS
 # from ..utils.ckpt_convert import giga_converter
 # from ..utils.transformer import PatchEmbed, PatchMerging
 from ..layers import PatchEmbed, PatchMerging
+from .ls_conv_module import LSConv # Added import
 
 
 def conv3x3(in_planes: int, out_planes: int, stride: int = 1, groups: int = 1, dilation: int = 1) -> nn.Conv2d:
@@ -610,19 +611,7 @@ class LocalBlock(BaseModule):
         query_windows_sparse = query_windows_sparse.permute(0, 1, 4, 2, 3).view(B*K, C, self.window_size, self.window_size)
 
         # haha_point = time.time()
-        # Ensure dtypes match for scatter operation, common issue with AMP
-        if self.training and query_windows_sparse.dtype == torch.float16: # only attempt conversion if in FP16 mode likely due to AMP
-            # Assuming query_ffn will be FP16 if AMP is active and BasicBlock ran in autocast
-            # This part needs careful checking based on how BasicBlock handles dtypes under AMP
-            query_ffn = self.layer(query_windows_sparse) # CORRECTED INDENTATION
-            if query_windows.dtype != query_ffn.dtype:
-                query_windows = query_windows.to(query_ffn.dtype)
-        else:
-            # Fallback or non-AMP path
-            query_ffn = self.layer(query_windows_sparse.to(query_windows.dtype)) # Ensure input to layer is consistent if not fp16
-            if query_windows.dtype != query_ffn.dtype: # Final check if layer changed dtype unexpectedly
-                 query_ffn = query_ffn.to(query_windows.dtype)
-
+        query_ffn = self.layer(query_windows_sparse)
 
         # query_ffn = self.ffn(query_windows_sparse, identity=identity)
         # print("ffn", time.time()-haha_point)
@@ -633,11 +622,6 @@ class LocalBlock(BaseModule):
 
         #####
         query_ffn = query_ffn.view(B, K, C, self.window_size, self.window_size).permute(0, 1, 3, 4, 2)
-        
-        # Ensure dtypes match for scatter operation
-        if query_windows.dtype != query_ffn.dtype:
-            query_windows = query_windows.to(query_ffn.dtype) # Match dtype of query_windows to query_ffn for scatter
-
         x = query_windows.scatter(src=query_ffn, dim=1,
                                              index=keep_token_indices.view(B, K, 1, 1, 1).repeat(1, 1,
                                                                                                  self.window_size,
@@ -708,45 +692,59 @@ class LocalBlock(BaseModule):
 
     def _make_layer(
         self,
-        block: Type[Union[BasicBlock, Bottleneck]],
-        planes: int,
-        blocks: int,
-        stride: int = 1,
-        dilate: bool = False,
+        block: Type[Union[BasicBlock, Bottleneck]], # block is BasicBlock for LocalBlock
+        planes: int, # This is embed_dims from the call site in LocalBlock.__init__ and is the actual input channels to LocalBlock
+        blocks: int, # Number of blocks to create in this layer sequence
+        stride: int = 1, # Default stride is 1, and usually is 1 for calls from LocalBlock
+        dilate: bool = False, # Not typically used with BasicBlock here
     ) -> nn.Sequential:
-        # self.inplanes = 64*(block.expansion**self.stage_id)
-        # self.inplanes = 96*(block.expansion**self.stage_id)
-        self.inplanes = 64*(2**self.stage_id)
+
+        first_block_inplanes = planes # Use the 'planes' passed to _make_layer, which is embed_dims of LocalBlock
+        
         norm_layer = self._norm_layer
         downsample = None
-        if stride != 1 or self.inplanes != planes * block.expansion:
+        
+        # Determine if downsampling is needed for the first block
+        # This happens if stride is not 1 OR if input channels don't match output channels for the block.
+        # For the first block of LocalBlock, its input is `planes` (embed_dims), its output base is also `planes`.
+        # So, only stride would trigger this for BasicBlock (expansion=1), but stride is typically 1 here.
+        if stride != 1 or first_block_inplanes != planes * block.expansion: 
             downsample = nn.Sequential(
-                conv1x1(self.inplanes, planes * block.expansion, stride),
+                conv1x1(first_block_inplanes, planes * block.expansion, stride),
                 norm_layer(planes * block.expansion),
             )
-        if norm_layer is None:
-            norm_layer = nn.BatchNorm2d
 
         layers = []
-        previous_dilation = 1
-        self.dilation = 1
+        # Add the first block (original BasicBlock)
+        # It handles the stride and potential downsampling/channel adjustment.
+        # The 'previous_dilation' parameter in the original block call was 1.
         layers.append(
-            block(
-                self.inplanes, planes, stride, downsample, self.groups, self.base_width, previous_dilation, norm_layer
+            block( # Assuming 'block' is BasicBlock here based on typical usage in SparseNet
+                first_block_inplanes, # Input channels for the first block
+                planes,             # Output base channels for the block
+                stride,             # Stride for the first block
+                downsample,         # Downsample layer if needed
+                self.groups,        # groups, typically 1 for BasicBlock
+                self.base_width,    # base_width, typically 64 for BasicBlock
+                1,                  # previous_dilation, was 1. Dilation for convs inside BasicBlock.
+                norm_layer
             )
         )
-        self.inplanes = planes * block.expansion
+        
+        # For subsequent blocks, the number of input channels will be planes * block.expansion.
+        # For BasicBlock, expansion is 1, so inplanes for next blocks is 'planes'.
+        current_planes_for_lsconv = planes * block.expansion # Should be just 'planes' if block is BasicBlock
+        
+        # Replace subsequent (blocks - 1) BasicBlocks with LSConv
         for _ in range(1, blocks):
+            # These blocks originally had stride=1, no downsample, 
+            # and input/output channels = current_planes_for_lsconv.
+            # Original BasicBlock also used self.dilation (which was 1) and norm_layer.
+            # LSConv does not take these directly but has its own internal structure.
             layers.append(
-                block(
-                    self.inplanes,
-                    planes,
-                    groups=self.groups,
-                    base_width=self.base_width,
-                    dilation=self.dilation,
-                    norm_layer=norm_layer,
-                )
+                LSConv(dim=current_planes_for_lsconv)
             )
+            # LSConv maintains the dimension, so current_planes_for_lsconv remains the same for the next LSConv.
 
         return nn.Sequential(*layers)
 
@@ -1412,45 +1410,59 @@ class GlobalBlock(BaseModule):
 
     def _make_layer(
         self,
-        block: Type[Union[BasicBlock, Bottleneck]],
-        planes: int,
-        blocks: int,
-        stride: int = 1,
-        dilate: bool = False,
+        block: Type[Union[BasicBlock, Bottleneck]], # block is BasicBlock for GlobalBlock
+        planes: int, # This is embed_dims from the call site in GlobalBlock.__init__ and is the actual input channels to GlobalBlock
+        blocks: int, # Number of blocks to create in this layer sequence
+        stride: int = 1, # Default stride is 1, and usually is 1 for calls from GlobalBlock
+        dilate: bool = False, # Not typically used with BasicBlock here
     ) -> nn.Sequential:
-        # self.inplanes = 64*(block.expansion**self.stage_id)
-        # self.inplanes = 96*(block.expansion**self.stage_id)
-        self.inplanes = 64*(2**self.stage_id)
+
+        first_block_inplanes = planes # Use the 'planes' passed to _make_layer, which is embed_dims of GlobalBlock
+        
         norm_layer = self._norm_layer
         downsample = None
-        if stride != 1 or self.inplanes != planes * block.expansion:
+        
+        # Determine if downsampling is needed for the first block
+        # This happens if stride is not 1 OR if input channels don't match output channels for the block
+        # For the first block of GlobalBlock, its input is `planes` (embed_dims), its output base is also `planes`.
+        # So, only stride would trigger this for BasicBlock (expansion=1).
+        if stride != 1 or first_block_inplanes != planes * block.expansion: 
             downsample = nn.Sequential(
-                conv1x1(self.inplanes, planes * block.expansion, stride),
+                conv1x1(first_block_inplanes, planes * block.expansion, stride),
                 norm_layer(planes * block.expansion),
             )
-        if norm_layer is None:
-            norm_layer = nn.BatchNorm2d
 
         layers = []
-        previous_dilation = 1
-        self.dilation = 1
+        # Add the first block (original BasicBlock)
+        # It handles the stride and potential downsampling/channel adjustment.
+        # The 'previous_dilation' parameter in the original block call was 1.
         layers.append(
-            block(
-                self.inplanes, planes, stride, downsample, self.groups, self.base_width, previous_dilation, norm_layer
+            block( # Assuming 'block' is BasicBlock here based on typical usage in SparseNet
+                first_block_inplanes, # Input channels for the first block
+                planes,             # Output base channels for the block
+                stride,             # Stride for the first block
+                downsample,         # Downsample layer if needed
+                self.groups,        # groups, typically 1 for BasicBlock
+                self.base_width,    # base_width, typically 64 for BasicBlock
+                1,                  # previous_dilation, was 1. Dilation for convs inside BasicBlock.
+                norm_layer
             )
         )
-        self.inplanes = planes * block.expansion
+        
+        # For subsequent blocks, the number of input channels will be planes * block.expansion.
+        # For BasicBlock, expansion is 1, so inplanes for next blocks is 'planes'.
+        current_planes_for_lsconv = planes * block.expansion # Should be just 'planes' if block is BasicBlock
+        
+        # Replace subsequent (blocks - 1) BasicBlocks with LSConv
         for _ in range(1, blocks):
+            # These blocks originally had stride=1, no downsample, 
+            # and input/output channels = current_planes_for_lsconv.
+            # Original BasicBlock also used self.dilation (which was 1) and norm_layer.
+            # LSConv does not take these directly but has its own internal structure.
             layers.append(
-                block(
-                    self.inplanes,
-                    planes,
-                    groups=self.groups,
-                    base_width=self.base_width,
-                    dilation=self.dilation,
-                    norm_layer=norm_layer,
-                )
+                LSConv(dim=current_planes_for_lsconv)
             )
+            # LSConv maintains the dimension, so current_planes_for_lsconv remains the same for the next LSConv.
 
         return nn.Sequential(*layers)
 

@@ -4,12 +4,14 @@ import tempfile
 from functools import partial
 from pathlib import Path
 
+import numpy as np
 import torch
 from mmengine.config import Config, DictAction
 from mmengine.logging import MMLogger
 from mmengine.model import revert_sync_batchnorm
 from mmengine.registry import init_default_scope
 from mmengine.runner import Runner
+from mmengine.utils import digit_version
 
 from mmdet.registry import MODELS
 
@@ -24,11 +26,10 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Get a detector flops')
     parser.add_argument('config', help='train config file path')
     parser.add_argument(
-        '--shape',
+        '--num-images',
         type=int,
-        nargs='+',
-        default=[1280, 800],
-        help='input image size')
+        default=1,
+        help='num images of calculate model flops')
     parser.add_argument(
         '--cfg-options',
         nargs='+',
@@ -44,7 +45,7 @@ def parse_args():
 
 
 def inference(args, logger):
-    if str(torch.__version__) < '1.12':
+    if digit_version(torch.__version__) < digit_version('1.12'):
         logger.warning(
             'Some config files, such as configs/yolact and configs/detectors,'
             'may have compatibility issues with torch.jit when torch<1.12. '
@@ -56,8 +57,9 @@ def inference(args, logger):
         logger.error(f'{config_name} not found.')
 
     cfg = Config.fromfile(args.config)
+    cfg.val_dataloader.batch_size = 1
     cfg.work_dir = tempfile.TemporaryDirectory().name
-    cfg.log_level = 'WARN'
+
     if args.cfg_options is not None:
         cfg.merge_from_dict(args.cfg_options)
 
@@ -74,72 +76,40 @@ def inference(args, logger):
         cfg['model']['roi_head']['mask_head']['norm_cfg'] = dict(
             type='SyncBN', requires_grad=True)
 
-    if len(args.shape) == 1:
-        h = w = args.shape[0]
-    elif len(args.shape) == 2:
-        h, w = args.shape
-    else:
-        raise ValueError('invalid input shape')
     result = {}
-
-    # Supports two ways to calculate flops,
-    # 1. randomly generate a picture
-    # 2. load a picture from the dataset
-    # In two stage detectors, _forward need batch_samples to get
-    # rpn_results_list, then use rpn_results_list to compute flops,
-    # so only the second way is supported
-    # try:
-    #     model = MODELS.build(cfg.model)
-    #     if torch.cuda.is_available():
-    #         model.cuda()
-    #     model = revert_sync_batchnorm(model)
-    #     data_batch = {'inputs': [torch.rand(3, h, w)], 'batch_samples': [None]}
-    #     data = model.data_preprocessor(data_batch)
-    #     result['ori_shape'] = (h, w)
-    #     result['pad_shape'] = data['inputs'].shape[-2:]
-    #     model.eval()
-    #     outputs = get_model_complexity_info(
-    #         model,
-    #         None,
-    #         inputs=data['inputs'],
-    #         show_table=False,
-    #         show_arch=False)
-    #     flops = outputs['flops']
-    #     params = outputs['params']
-    #     result['compute_type'] = 'direct: randomly generate a picture'
-
-    # except TypeError:
-    logger.warning(
-        'Failed to directly get FLOPs, try to get flops with real data')
+    avg_flops = []
     data_loader = Runner.build_dataloader(cfg.val_dataloader)
-    data_batch = next(iter(data_loader))
-    print("hahahaha", data_batch.keys())
-    print(data_batch['data_samples'])
     model = MODELS.build(cfg.model)
     if torch.cuda.is_available():
         model = model.cuda()
     model = revert_sync_batchnorm(model)
     model.eval()
     _forward = model.forward
-    data = model.data_preprocessor(data_batch)
-    result['ori_shape'] = data['data_samples'][0].ori_shape
-    result['pad_shape'] = data['data_samples'][0].pad_shape
 
+    for idx, data_batch in enumerate(data_loader):
+        if idx == args.num_images:
+            break
+        data = model.data_preprocessor(data_batch)
+        result['ori_shape'] = data['data_samples'][0].ori_shape
+        result['pad_shape'] = data['data_samples'][0].pad_shape
+        if hasattr(data['data_samples'][0], 'batch_input_shape'):
+            result['pad_shape'] = data['data_samples'][0].batch_input_shape
+        model.forward = partial(_forward, data_samples=data['data_samples'])
+        outputs = get_model_complexity_info(
+            model,
+            None,
+            inputs=data['inputs'],
+            show_table=True,
+            show_arch=False)
+        avg_flops.append(outputs['flops'])
+        params = outputs['params']
+        result['compute_type'] = 'dataloader: load a picture from the dataset'
+        result['table'] = outputs['out_table']
     del data_loader
-    model.forward = partial(_forward, data_samples=data['data_samples'])
-    outputs = get_model_complexity_info(
-        model,
-        None,
-        inputs=data['inputs'],
-        show_table=False,
-        show_arch=False)
-    flops = outputs['flops']
-    params = outputs['params']
-    result['compute_type'] = 'dataloader: load a picture from the dataset'
 
-    flops = _format_size(flops)
+    mean_flops = _format_size(int(np.average(avg_flops)))
     params = _format_size(params)
-    result['flops'] = flops
+    result['flops'] = mean_flops
     result['params'] = params
 
     return result
@@ -150,13 +120,13 @@ def main():
     logger = MMLogger.get_instance(name='MMLogger')
     result = inference(args, logger)
     split_line = '=' * 30
-    ori_shape = result['ori_shape']
-    pad_shape = result['pad_shape']
-    flops = result['flops']
-    params = result['params']
-    compute_type = result['compute_type']
+    ori_shape = result.get('ori_shape')
+    pad_shape = result.get('pad_shape')
+    flops = result.get('flops')
+    params = result.get('params')
+    compute_type = result.get('compute_type')
 
-    if pad_shape != ori_shape:
+    if pad_shape and ori_shape and pad_shape != ori_shape:
         print(f'{split_line}\nUse size divisor set input shape '
               f'from {ori_shape} to {pad_shape}')
     print(f'{split_line}\nCompute type: {compute_type}\n'
@@ -165,6 +135,20 @@ def main():
     print('!!!Please be cautious if you use the results in papers. '
           'You may need to check if all ops are supported and verify '
           'that the flops computation is correct.')
+
+    config_path = Path(args.config)
+    config_name_stem = config_path.stem 
+    output_txt_filename = f"flops_table_{config_name_stem}.txt"
+
+    try:
+        with open(output_txt_filename, 'w') as f:
+            if 'table' in result and result['table']:
+                f.write(result['table'])
+            else:
+                f.write("FLOPs table data was not generated or found in results.\nEnsure 'show_table=True' and result['table'] = outputs['out_table'] in inference function.")
+        print(f"FLOPs table saved to: {output_txt_filename}")
+    except Exception as e:
+        print(f"Error writing FLOPs table to {output_txt_filename}: {e}")
 
 
 if __name__ == '__main__':

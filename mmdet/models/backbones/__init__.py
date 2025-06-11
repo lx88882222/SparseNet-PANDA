@@ -19,12 +19,16 @@ from .swin import SwinTransformer
 from .trident_resnet import TridentResNet
 from .giganet_shift import SparseFormer
 from .pvt_dge import pvt_tiny
-from .sparsenet import SparseNet
+from .lsnet import Block as LSNetOriginalBlock
+from .lsnet import LSConv as LSNetLSConv
+from .lsnet import LSNet
+from .ska import SKA
 
 __all__ = [
     'RegNet', 'ResNet', 'ResNetV1d', 'ResNeXt', 'SSDVGG', 'HRNet',
     'MobileNetV2', 'Res2Net', 'HourglassNet', 'DetectoRS_ResNet',
     'DetectoRS_ResNeXt', 'Darknet', 'ResNeSt', 'TridentResNet', 'CSPDarknet',
     'SwinTransformer', 'PyramidVisionTransformer', 'SparseFormer',
-    'PyramidVisionTransformerV2', 'EfficientNet', 'CSPNeXt', 'pvt_tiny', 'SparseNet,
+    'PyramidVisionTransformerV2', 'EfficientNet', 'CSPNeXt', 'pvt_tiny',
+    'LSNetOriginalBlock', 'LSNetLSConv', 'LSNet', 'SKA'
 ]

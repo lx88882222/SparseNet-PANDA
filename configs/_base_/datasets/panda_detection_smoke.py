@@ -35,7 +35,7 @@ train_dataloader = dict(
         type=dataset_type,
         data_root='/data1/lixiang/panda/', # Adjusted data_root for training
         metainfo=metainfo,
-        ann_file='train_mix_all_train.json', # Relative to data_root
+        ann_file='smoke_train_10.json', # <--- 修改为冒烟测试训练标注
         data_prefix=dict(img='patch_mix_alltrain/'), # Relative to data_root, ensure trailing slash
         filter_cfg=dict(filter_empty_gt=True, min_size=32),
         pipeline=train_pipeline))
@@ -50,7 +50,7 @@ val_dataloader = dict(
         type=dataset_type,
         data_root='/data1/lixiang/PANDA/PANDA/', # Adjusted data_root for validation
         metainfo=metainfo,
-        ann_file='coco_json/val_s4.json', # Relative to data_root
+        ann_file='coco_json/smoke_val_5.json', # <--- 修改为冒烟测试验证标注
         data_prefix=dict(img='patches/s4/'), # Relative to data_root, ensure trailing slash
         test_mode=True,
         pipeline=test_pipeline))
@@ -58,7 +58,7 @@ test_dataloader = val_dataloader
 
 val_evaluator = dict(
     type='CocoMetric',
-    ann_file='/data1/lixiang/PANDA/PANDA/coco_json/val_s4.json', 
+    ann_file='/data1/lixiang/PANDA/PANDA/coco_json/smoke_val_5.json', # Corrected to smoke_val_5.json
     metric='bbox',
     format_only=False
 )

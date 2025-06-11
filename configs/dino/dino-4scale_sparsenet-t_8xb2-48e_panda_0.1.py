@@ -38,7 +38,7 @@ model = dict(
         depths=[2, 2, 6, 2],  
         layers=[2, 2, 6, 2],  
         num_heads=[3, 6, 12, 24], 
-        top_k=[0.7, 0.7, 0.7, 0.7],  
+        top_k=[0.1, 0.1, 0.1, 0.1],  
         window_size=7, 
         mlp_ratio=4,
         qkv_bias=True,
@@ -193,12 +193,12 @@ param_schedulers = [
 ]
 
 # training schedule for 36e
-train_cfg = dict(type='EpochBasedTrainLoop', max_epochs=48, val_interval=1) # 修改这里: 36 -> 42
+train_cfg = dict(type='EpochBasedTrainLoop', max_epochs=48, val_interval=1) # 修改这里: 36 -> 48
 val_cfg = dict(type='ValLoop')
 test_cfg = dict(type='TestLoop')
 
-# 加载指定epoch的权重
-load_from = 'work_dirs/dino_sparsenet_original_resume_ep36_6gpu_20250529_163241/epoch_42.pth' # 修改这里
+# # 加载指定epoch的权重
+# load_from = 'work_dirs/dino_sparsenet_original_resume_ep36_6gpu_20250529_163241/epoch_42.pth' # 修改这里
 
 # NOTE: `auto_scale_lr` is for automatically scaling LR,
 # USER SHOULD NOT CHANGE ITS VALUES.

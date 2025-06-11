@@ -1,0 +1,13 @@
+{
+    "original_shape": [
+        4096,
+        8192
+    ],
+    "padded_shape": [
+        667,
+        1333
+    ],
+    "flops_str": "0.31T",
+    "params_str": "0.146G",
+    "compute_type": "dataloader: load a picture from the dataset"
+}
