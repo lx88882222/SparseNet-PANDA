@@ -6,7 +6,11 @@
 
 This repository contains the official implementation for the final project of the Machine Learning course (Spring 2025) at Tsinghua University. This project investigates the architectural trade-offs for efficient and accurate object detection on the gigapixel-level, highly sparse PANDA dataset.
 
-Starting from the strong baseline of [SparseFormer](https://arxiv.org/abs/2402.07216), this work embarks on a research journey to explore the balance between computational efficiency (GFLOPs) and detection accuracy (AP). We construct our own ConvNet-based baseline, **`SparseNet`**, and further innovate by integrating the highly efficient **LS-Block** from [LSNet](https://arxiv.org/abs/2403.14135), leading to a valuable discovery about designing networks for this unique visual challenge.
+This work is built upon two excellent open-source projects:
+*   [**SparseFormer (showlab/sparseformer)**](https://github.com/showlab/sparseformer)
+*   [**LSNet (THU-MIG/lsnet)**](https://github.com/THU-MIG/lsnet)
+
+Our code starts from the [SparseFormer](https://github.com/showlab/sparseformer) baseline and innovatively integrates the highly efficient **LS-Block** from [LSNet](https://github.com/THU-MIG/lsnet), leading to a valuable discovery about designing networks for this unique visual challenge.
 
 ---
 
@@ -61,31 +65,37 @@ Please download the PANDA dataset from the [official website](https://www.gigavi
 
 You can easily reproduce the results of our best-performing model (`SparseNet`). The champion model weights and its corresponding configuration file are located in the `/checkpoints` directory.
 
-1.  **Run the inference script:**
-    ```bash
-    # Make sure you are in the project root directory
-    python tools/test.py \
-        checkpoints/config.py \
-        checkpoints/best_model.pth \
-        --out results.pkl \
-        --show
-    ```
-    This will run inference on the test set and you should be able to reproduce the key metrics reported.
+To run distributed testing on **N** GPUs:
+```bash
+# Make sure you are in the project root directory
+./tools/dist_test.sh \
+    checkpoints/config.py \
+    checkpoints/best_model.pth \
+    N
+```
 
-### (Optional) Training from Scratch
+### Training From Scratch
 
-To train the models yourself, you can use the following commands.
+To train the models yourself, you can use the following commands for multi-GPU training.
 
 *   **Train `SparseNet` (Our Baseline):**
     ```bash
     # This command trains the baseline model that achieved 0.70 AP50
-    python tools/train.py [PATH_TO_SPARSENET_CONFIG]
+    # Replace N with the number of GPUs you want to use.
+    ./tools/dist_train.sh \
+        [PATH_TO_YOUR_SPARSENET_CONFIG] \
+        N \
+        --work-dir ./work_dirs/my_sparsenet_experiment
     ```
 
 *   **Train `SparseNet-LS` (Our Experiment):**
     ```bash
     # This command trains the experimental model with LS-Blocks
-    python tools/train.py [PATH_TO_SPARSENET_LS_CONFIG]
+    # Replace N with the number of GPUs you want to use.
+    ./tools/dist_train.sh \
+        [PATH_TO_YOUR_SPARSENET_LS_CONFIG] \
+        N \
+        --work-dir ./work_dirs/my_sparsenet_ls_experiment
     ```
 
 ---
@@ -108,20 +118,14 @@ This project provides a comprehensive study on vision architectures for gigapixe
 2.  We conducted a novel experiment by integrating the `LS-Block` into our baseline, quantitatively revealing a critical accuracy-efficiency trade-off specific to HRW datasets.
 3.  Our findings suggest that for sparse detection tasks, the architectural capacity for dynamic, fine-grained feature extraction is paramount, offering valuable insights for future network design in this domain.
 
+### Acknowledgements
+
+This work would not have been possible without the excellent codebases provided by the authors of [SparseFormer](https://github.com/showlab/sparseformer) and [LSNet](https://github.com/THU-MIG/lsnet). We sincerely thank them for their open-source contributions to the community.
+
 
 
 #### 📰 <a href="https://xxx" style="color: black; text-decoration: underline;text-decoration-style: dotted;">Paper</a>     :building_construction: <a href="https:/xxx" style="color: black; text-decoration: underline;text-decoration-style: dotted;">Model (via Google)</a>    :building_construction: <a href="https://pan.baidu.com/s/" style="color: black; text-decoration: underline;text-decoration-style: dotted;">Model (via Baidu)</a>    :card_file_box: <a href="https://www.gigavision.cn/data/news?nav=DataSet%20Panda&type=nav&t=1689145968317" style="color: black; text-decoration: underline;text-decoration-style: dotted;">Dataset</a>    :bricks: [Code](#usage)    :monocle_face: Video    :technologist: Demo    
 
-
-
-## Table of Contents 📚
-
-- [Introduction](#introduction)
-- [Key Features](#key-features)
-- [Architecture](#architecture)
-- [Installation](#installation)
-- [Usage](#usage)
-- [Future Work and Contributions](#future-work-and-contributions)
 
 
 
