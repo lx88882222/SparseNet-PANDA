@@ -7,10 +7,10 @@
 This repository contains the official implementation for the final project of the Machine Learning course (Spring 2025) at Tsinghua University. This project investigates the architectural trade-offs for efficient and accurate object detection on the gigapixel-level, highly sparse PANDA dataset.
 
 This work is built upon two excellent open-source projects:
-*   [**SparseFormer (showlab/sparseformer)**](https://github.com/showlab/sparseformer)
+*   [**SparseFormer (liwenxi/SparseFormer)**](https://github.com/liwenxi/SparseFormer)
 *   [**LSNet (THU-MIG/lsnet)**](https://github.com/THU-MIG/lsnet)
 
-Our code starts from the [SparseFormer](https://github.com/showlab/sparseformer) baseline and innovatively integrates the highly efficient **LS-Block** from [LSNet](https://github.com/THU-MIG/lsnet), leading to a valuable discovery about designing networks for this unique visual challenge.
+Our code starts from the [SparseFormer](https://github.com/liwenxi/SparseFormer) baseline and innovatively integrates the highly efficient **LS-Block** from [LSNet](https://github.com/THU-MIG/lsnet), leading to a valuable discovery about designing networks for this unique visual challenge.
 
 ---
 
@@ -120,7 +120,7 @@ This project provides a comprehensive study on vision architectures for gigapixe
 
 ### Acknowledgements
 
-This work would not have been possible without the excellent codebases provided by the authors of [SparseFormer](https://github.com/showlab/sparseformer) and [LSNet](https://github.com/THU-MIG/lsnet). We sincerely thank them for their open-source contributions to the community.
+This work would not have been possible without the excellent codebases provided by the authors of [SparseFormer](https://github.com/liwenxi/SparseFormer) and [LSNet](https://github.com/THU-MIG/lsnet). We sincerely thank them for their open-source contributions to the community.
 
 
 
